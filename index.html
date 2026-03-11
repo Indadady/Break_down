@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>행사비 블랙다운 산출기 - TOURMAKER</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #print-section, #print-section * { visibility: visible; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 20px; }
+            .no-print { display: none !important; }
+            /* 프린트 시 배경색 강제 적용 */
+            .print-bg-gray { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-bg-blue { background-color: #e0e7ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-bg-dark { background-color: #1e293b !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-border { border-color: #4b5563 !important; }
+        }
+        
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #4b5563; padding: 8px 10px; font-size: 13px; }
+        th { text-align: center; font-weight: bold; }
+        .text-center-cell { text-align: center; }
+        .text-right-cell { text-align: right; }
+        .formula-text { color: #4b5563; font-size: 12px; }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 flex flex-col">
+
+    <!-- 헤더 바 -->
+    <div class="bg-slate-800 text-white p-4 flex justify-between items-center no-print shadow-md z-10">
+        <div class="flex items-center gap-3">
+            <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHfgIX70O5k6Anuo0UgALIdaG9jSga9auHu3uyz0uEirylGPAJnjN_qQbvEGMUvPqUQf_g9FMNUHRxlDcUBf4vZ3Mpy4TnA9WxbmzWYK11gt2zuy_Irl4wctNFjcjLyPo0GPXV792o_J7L9guRMuDfeC1gy7USwywjYbECZgzcsHybuGRRAXAnO1eNmP8/s320/logo.png" alt="Tourmaker" class="h-8 bg-white rounded p-1">
+            <h1 class="text-xl font-bold">1인당 행사비(원가) 블랙다운 산출기</h1>
+        </div>
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md font-semibold shadow transition">
+            PDF 저장 / 엑셀 양식 인쇄
+        </button>
+    </div>
+
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <!-- 좌측: 데이터 입력 패널 (인터페이스) -->
+        <div class="w-full lg:w-[400px] bg-white border-r border-gray-200 p-6 overflow-y-auto no-print">
+            <h2 class="text-lg font-bold mb-4 border-b-2 border-slate-800 pb-2">랜드사 원가 데이터 입력</h2>
+            
+            <div class="space-y-5 text-sm">
+                <!-- 1. 기본 변수 -->
+                <div class="bg-gray-50 p-4 rounded border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-800 mb-3 flex items-center"><span class="w-5 h-5 bg-slate-700 text-white rounded-full inline-flex items-center justify-center text-xs mr-2">1</span>기본 변수 (분모)</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between"><label class="text-gray-600">적용 환율</label><input type="number" step="0.1" id="inp-exchangeRate" class="w-24 border border-gray-300 rounded p-1.5 text-right font-bold text-blue-600 bg-blue-50"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-600">N빵 유료 인원수 (명)</label><input type="number" id="inp-payingPax" class="w-24 border border-gray-300 rounded p-1.5 text-right font-bold"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-600">항공 발권 총 인원수</label><input type="number" id="inp-totalPax" class="w-24 border border-gray-300 rounded p-1.5 text-right"></div>
+                        <div><label class="block text-gray-600 mb-1">상세 인원 표기</label><input type="text" id="inp-totalPaxStr" class="w-full border border-gray-300 rounded p-1.5"></div>
+                        <div>
+                            <label class="block text-gray-600 mb-1">행사 기간 / 지역</label>
+                            <input type="text" id="inp-travelPeriod" class="w-full border border-gray-300 rounded p-1.5 mb-1" placeholder="기간">
+                            <input type="text" id="inp-travelArea" class="w-full border border-gray-300 rounded p-1.5" placeholder="지역">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 원화 비용 -->
+                <div class="bg-gray-50 p-4 rounded border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-800 mb-3 flex items-center"><span class="w-5 h-5 bg-slate-700 text-white rounded-full inline-flex items-center justify-center text-xs mr-2">2</span>항공/보험료 (KRW)</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between"><label class="text-gray-600">항공료 단가</label><input type="number" id="inp-flightPrice" class="w-28 border border-gray-300 rounded p-1.5 text-right"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-600">발권수수료 단가</label><input type="number" id="inp-ticketingFee" class="w-28 border border-gray-300 rounded p-1.5 text-right"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-600">1인 보험료</label><input type="number" id="inp-insurancePerPax" class="w-28 border border-gray-300 rounded p-1.5 text-right"></div>
+                    </div>
+                </div>
+
+                <!-- 3. 엔화 1인 단가 -->
+                <div class="bg-blue-50 p-4 rounded border border-blue-200 shadow-sm">
+                    <h3 class="font-bold text-blue-900 mb-3 flex items-center"><span class="w-5 h-5 bg-blue-800 text-white rounded-full inline-flex items-center justify-center text-xs mr-2">3</span>지상비 1인 단가 (JPY)</h3>
+                    <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2"><label class="text-gray-600 text-xs">호텔 1박 단가</label><label class="text-gray-600 text-xs">숙박 일수</label><input type="number" id="inp-hotelJpyPerNight" class="border border-gray-300 rounded p-1.5 text-right"><input type="number" id="inp-hotelNights" class="border border-gray-300 rounded p-1.5 text-right"></div>
+                        <div class="grid grid-cols-2 gap-2"><label class="text-gray-600 text-xs">중식 1끼 단가</label><label class="text-gray-600 text-xs">중식 횟수</label><input type="number" id="inp-lunchJpy" class="border border-gray-300 rounded p-1.5 text-right"><input type="number" id="inp-lunchCount" class="border border-gray-300 rounded p-1.5 text-right"></div>
+                        <div class="grid grid-cols-2 gap-2"><label class="text-gray-600 text-xs">석식 1끼 단가</label><label class="text-gray-600 text-xs">석식 횟수</label><input type="number" id="inp-dinnerJpy" class="border border-gray-300 rounded p-1.5 text-right"><input type="number" id="inp-dinnerCount" class="border border-gray-300 rounded p-1.5 text-right"></div>
+                        
+                        <div class="pt-2 border-t border-blue-200">
+                            <div class="flex gap-2 mb-2"><input type="text" id="inp-adm1Name" class="w-1/2 border border-gray-300 rounded p-1.5 text-sm"><input type="number" id="inp-adm1Jpy" class="w-1/2 border border-gray-300 rounded p-1.5 text-right" placeholder="금액"></div>
+                            <div class="flex gap-2"><input type="text" id="inp-adm2Name" class="w-1/2 border border-gray-300 rounded p-1.5 text-sm"><input type="number" id="inp-adm2Jpy" class="w-1/2 border border-gray-300 rounded p-1.5 text-right" placeholder="금액"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 엔화 분배 총액 -->
+                <div class="bg-orange-50 p-4 rounded border border-orange-200 shadow-sm">
+                    <h3 class="font-bold text-orange-900 mb-3 flex items-center"><span class="w-5 h-5 bg-orange-700 text-white rounded-full inline-flex items-center justify-center text-xs mr-2">4</span>공통 경비 (유료인원으로 N빵)</h3>
+                    <p class="text-xs text-orange-700 mb-3">* 입력된 총액은 유료인원(<span id="out-payingPaxHint" class="font-bold"></span>명)으로 자동 분할됩니다.</p>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between"><label class="text-gray-700">전체 차량비 (JPY)</label><input type="number" id="inp-busTotalJpy" class="w-28 border border-gray-300 rounded p-1.5 text-right font-bold text-orange-800"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-700">인솔비용 총액 (JPY)</label><input type="number" id="inp-tcTotalJpy" class="w-28 border border-gray-300 rounded p-1.5 text-right font-bold text-orange-800"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-700">기사비용 총액 (JPY)</label><input type="number" id="inp-driverTotalJpy" class="w-28 border border-gray-300 rounded p-1.5 text-right font-bold text-orange-800"></div>
+                        <div class="flex items-center justify-between"><label class="text-gray-700">가이드비용 총액 (JPY)</label><input type="number" id="inp-guideTotalJpy" class="w-28 border border-gray-300 rounded p-1.5 text-right font-bold text-orange-800"></div>
+                        
+                        <div class="pt-2 border-t border-orange-200 mt-2">
+                            <label class="text-gray-700 text-xs block mb-1">생수 분배 식 (단가 x 수량 x 일수)</label>
+                            <div class="flex gap-1">
+                                <input type="number" id="inp-waterUnitJpy" class="w-1/3 border border-gray-300 rounded p-1.5 text-right" title="단가">
+                                <input type="number" id="inp-waterQty" class="w-1/3 border border-gray-300 rounded p-1.5 text-right" title="수량">
+                                <input type="number" id="inp-waterDays" class="w-1/3 border border-gray-300 rounded p-1.5 text-right" title="일수">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측: 출력물 (엑셀 문서 영역) -->
+        <div class="w-full lg:flex-1 p-8 overflow-y-auto bg-gray-300 flex justify-center items-start">
+            <div id="print-section" class="bg-white p-12 shadow-xl w-full max-w-[850px]">
+                
+                <!-- 타이틀 및 메타정보 -->
+                <div class="mb-6 pb-4 border-b-2 border-slate-800">
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">&lt;행사비 1인당 원가 블랙다운&gt;</h2>
+                        <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgHfgIX70O5k6Anuo0UgALIdaG9jSga9auHu3uyz0uEirylGPAJnjN_qQbvEGMUvPqUQf_g9FMNUHRxlDcUBf4vZ3Mpy4TnA9WxbmzWYK11gt2zuy_Irl4wctNFjcjLyPo0GPXV792o_J7L9guRMuDfeC1gy7USwywjYbECZgzcsHybuGRRAXAnO1eNmP8/s320/logo.png" alt="TOUR MAKER" class="h-10">
+                    </div>
+                    
+                    <div class="text-sm space-y-2 mt-4 text-slate-800">
+                        <div class="flex"><strong class="w-24">1. 여행기간 :</strong> <span id="out-travelPeriod"></span></div>
+                        <div class="flex"><strong class="w-24">2. 인 원 :</strong> <span><span id="out-totalPaxStr"></span> (유료: <span id="out-payingPax"></span>명 / 전체: <span id="out-totalPax"></span>명)</span></div>
+                        <div class="flex"><strong class="w-24">3. 여행지역 :</strong> <span id="out-travelArea"></span></div>
+                        <div class="flex"><strong class="w-24 text-blue-700">4. 환 율 :</strong> <span class="text-blue-700 font-bold">JPY 100 = KRW <span id="out-ex100"></span> (@ <span id="out-exchangeRate"></span>)</span></div>
+                    </div>
+                </div>
+
+                <!-- 견적 테이블 -->
+                <table class="mb-4 text-sm w-full print-border">
+                    <thead>
+                        <tr>
+                            <th class="w-[20%] print-bg-gray bg-gray-100 py-3 border-slate-600">구분</th>
+                            <th class="w-[55%] print-bg-gray bg-gray-100 py-3 border-slate-600">내역 (산출식)</th>
+                            <th class="w-[25%] print-bg-gray bg-gray-100 py-3 border-slate-600">1인당 금액</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 1. 항공/보험 원화 -->
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">항공료</td>
+                            <td class="bg-white">
+                                <span class="formula-text">(₩<span id="txt-flightPrice"></span> * <span id="txt-totalPax1"></span>) / <span id="txt-payingPax1"></span></span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white">₩<span id="out-flightPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">발권수수료</td>
+                            <td class="bg-white">
+                                <span class="formula-text">(₩<span id="txt-ticketingFee"></span> * <span id="txt-totalPax2"></span>) / <span id="txt-payingPax2"></span></span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white">₩<span id="out-ticketPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">여행보험료</td>
+                            <td class="bg-white">
+                                <span class="formula-text">₩<span id="txt-insurancePerPax"></span> / 인</span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white">₩<span id="out-insurancePerPax"></span></td>
+                        </tr>
+                        <tr class="print-bg-gray bg-gray-50 border-b-2 border-slate-600">
+                            <td class="text-center-cell font-bold">소계 (KRW)</td>
+                            <td class="text-right-cell"></td>
+                            <td class="text-right-cell font-bold text-lg text-slate-800">₩<span id="out-krwSubtotal"></span></td>
+                        </tr>
+
+                        <!-- 2. 지상비 엔화 -->
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white pt-4">호텔비</td>
+                            <td class="bg-white pt-4">
+                                <span class="formula-text">¥<span id="txt-hotelJpyPerNight"></span> / 박 / 인 * <span id="txt-hotelNights"></span>박</span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white pt-4">¥<span id="out-hotelPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">호텔비(싱글업)</td>
+                            <td class="bg-white"><span class="formula-text text-gray-400">별도 산출</span></td>
+                            <td class="text-right-cell text-gray-400 bg-white">¥0</td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">중식비(<span id="txt-lunchCount1"></span>회)</td>
+                            <td class="bg-white">
+                                <span class="formula-text">¥<span id="txt-lunchJpy"></span> / 끼 / 인 * <span id="txt-lunchCount2"></span>끼</span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white">¥<span id="out-lunchPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">석식비(<span id="txt-dinnerCount1"></span>회)</td>
+                            <td class="bg-white">
+                                <span class="formula-text">¥<span id="txt-dinnerJpy"></span> / 끼 / 인 * <span id="txt-dinnerCount2"></span>끼</span>
+                            </td>
+                            <td class="text-right-cell font-semibold bg-white">¥<span id="out-dinnerPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">입장료</td>
+                            <td class="bg-white">
+                                <div class="formula-text">
+                                    <span id="txt-adm1Name"></span> ¥<span id="txt-adm1Jpy1"></span> <br/>
+                                    <span id="txt-adm2Name"></span> ¥<span id="txt-adm2Jpy1"></span> / 인
+                                </div>
+                            </td>
+                            <td class="text-right-cell font-semibold align-bottom bg-white">
+                                <div class="text-gray-500 text-xs mb-1">¥<span id="txt-adm1Jpy2"></span></div>
+                                <div class="text-gray-500 text-xs mb-1">¥<span id="txt-adm2Jpy2"></span></div>
+                                <div class="border-t border-gray-300 mt-1 pt-1">¥<span id="out-admPerPax"></span></div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">차량비</td>
+                            <td class="bg-white">
+                                <div class="formula-text mb-1">전일정 차량비+통행료+주차비</div>
+                                <span class="formula-text text-blue-600 font-semibold">총액 ¥<span id="txt-busTotalJpy"></span> / <span id="txt-payingPax3"></span>명</span>
+                            </td>
+                            <td class="text-right-cell font-semibold text-blue-700 bg-white">¥<span id="out-busPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">생수비</td>
+                            <td class="bg-white">
+                                <span class="formula-text text-blue-600">(¥<span id="txt-waterUnitJpy"></span> * <span id="txt-waterQty"></span>개 * <span id="txt-waterDays"></span>일) / <span id="txt-payingPax4"></span>명</span>
+                            </td>
+                            <td class="text-right-cell font-semibold text-blue-700 bg-white">¥<span id="out-waterPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">인솔비용</td>
+                            <td class="bg-white">
+                                <span class="formula-text text-blue-600">총액 ¥<span id="txt-tcTotalJpy"></span> / <span id="txt-payingPax5"></span>명</span>
+                            </td>
+                            <td class="text-right-cell font-semibold text-blue-700 bg-white">¥<span id="out-tcPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">기사비용</td>
+                            <td class="bg-white">
+                                <div class="formula-text mb-1">식비 & 봉사료</div>
+                                <span class="formula-text text-blue-600 font-semibold">총액 ¥<span id="txt-driverTotalJpy"></span> / <span id="txt-payingPax6"></span>명</span>
+                            </td>
+                            <td class="text-right-cell font-semibold text-blue-700 bg-white">¥<span id="out-driverPerPax"></span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-center-cell font-bold bg-white">가이드비용</td>
+                            <td class="bg-white">
+                                <div class="formula-text mb-1">일비+호텔비+식비</div>
+                                <span class="formula-text text-blue-600 font-semibold">총액 ¥<span id="txt-guideTotalJpy"></span> / <span id="txt-payingPax7"></span>명</span>
+                            </td>
+                            <td class="text-right-cell font-semibold text-blue-700 bg-white">¥<span id="out-guidePerPax"></span></td>
+                        </tr>
+                        <tr class="print-bg-blue bg-blue-50 border-t-2 border-slate-600">
+                            <td class="text-center-cell font-bold text-blue-900">지상비 (엔화)</td>
+                            <td class="text-right-cell"></td>
+                            <td class="text-right-cell font-bold text-lg text-blue-900">¥<span id="out-jpySubtotal"></span></td>
+                        </tr>
+                        <tr class="print-bg-gray bg-gray-100 border-b-2 border-slate-600">
+                            <td class="text-center-cell font-bold text-slate-800">소계 (지상비 한화)</td>
+                            <td class="text-center-cell">
+                                <span class="font-semibold text-slate-700">지상비 ¥<span id="txt-jpySubtotal"></span> @ <span id="txt-exchangeRate2"></span></span>
+                            </td>
+                            <td class="text-right-cell font-bold text-lg text-slate-800">₩<span id="out-convertedJpyToKrw"></span></td>
+                        </tr>
+                        
+                        <!-- 최종 합계 -->
+                        <tr class="print-bg-dark bg-slate-800 text-white border-none">
+                            <td colspan="2" class="text-center-cell font-bold text-lg py-4 border-slate-800">
+                                1인당 총 원가 (항공 + 지상비)
+                            </td>
+                            <td class="text-right-cell font-extrabold text-xl text-yellow-300 border-slate-800">
+                                ₩<span id="out-totalCostKrw"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- 푸터 -->
+                <div class="mt-12 text-center pb-6">
+                    <p class="text-[12px] text-[#6c757d] mb-2 font-medium">
+                        [System Powered by TOURMAKER] 본 행사비 블랙다운 산출 시스템은 <strong class="text-slate-700">투어메이커</strong>의 기획과 트래블 테크 기술 제휴로 제작되었습니다.
+                    </p>
+                    <a href="http://tourmaker.kr" target="_blank" rel="noopener noreferrer" 
+                       class="inline-block px-4 py-2 border border-[#6c757d] rounded text-[#6c757d] hover:bg-gray-100 hover:text-slate-800 transition text-xs font-bold no-print">
+                        투어메이커 홈페이지 바로가기
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 로직 -->
+    <script>
+        // 초기 데이터 상태
+        let data = {
+            travelPeriod: '2026.05.19.(화)~05.22.(금)',
+            totalPaxStr: '59+1TC+2TG',
+            travelArea: '오사카(유니버셜)/교토 3박4일',
+            payingPax: 59,
+            totalPax: 62,
+            exchangeRate: 9.5,
+            flightPrice: 294600,
+            ticketingFee: 22000,
+            insurancePerPax: 5000,
+            hotelJpyPerNight: 9000,
+            hotelNights: 3,
+            lunchJpy: 2000,
+            lunchCount: 2,
+            dinnerJpy: 3000,
+            dinnerCount: 3,
+            adm1Name: '청수사',
+            adm1Jpy: 500,
+            adm2Name: '유니버셜',
+            adm2Jpy: 8000,
+            busTotalJpy: 1000000,
+            waterUnitJpy: 120,
+            waterQty: 63,
+            waterDays: 3,
+            tcTotalJpy: 47000,
+            driverTotalJpy: 66000,
+            guideTotalJpy: 290000
+        };
+
+        // DOM 요소에 값 세팅 및 계산
+        function render() {
+            // 입력창에 값 세팅
+            for (let key in data) {
+                const el = document.getElementById('inp-' + key);
+                if (el) el.value = data[key];
+            }
+
+            // 계산식 적용
+            const payingPax = data.payingPax || 1; // 0으로 나누기 방지
+            const flightPerPax = Math.round((data.flightPrice * data.totalPax) / payingPax);
+            const ticketPerPax = Math.round((data.ticketingFee * data.totalPax) / payingPax);
+            const krwSubtotal = flightPerPax + ticketPerPax + data.insurancePerPax;
+
+            const hotelPerPax = data.hotelJpyPerNight * data.hotelNights;
+            const lunchPerPax = data.lunchJpy * data.lunchCount;
+            const dinnerPerPax = data.dinnerJpy * data.dinnerCount;
+            const admPerPax = data.adm1Jpy + data.adm2Jpy;
+            
+            const busPerPax = Math.round(data.busTotalJpy / payingPax);
+            const waterPerPax = Math.round((data.waterUnitJpy * data.waterQty * data.waterDays) / payingPax);
+            const tcPerPax = Math.round(data.tcTotalJpy / payingPax);
+            const driverPerPax = Math.round(data.driverTotalJpy / payingPax);
+            const guidePerPax = Math.round(data.guideTotalJpy / payingPax);
+
+            const jpySubtotal = hotelPerPax + lunchPerPax + dinnerPerPax + admPerPax + busPerPax + waterPerPax + tcPerPax + driverPerPax + guidePerPax;
+            const convertedJpyToKrw = Math.round(jpySubtotal * data.exchangeRate);
+            const totalCostKrw = krwSubtotal + convertedJpyToKrw;
+
+            // 텍스트 업데이트 헬퍼 함수
+            const setHtml = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = val;
+            };
+            const formatNum = (num) => Number(num).toLocaleString();
+
+            // 상단 메타 정보
+            setHtml('out-travelPeriod', data.travelPeriod);
+            setHtml('out-totalPaxStr', data.totalPaxStr);
+            setHtml('out-travelArea', data.travelArea);
+            setHtml('out-payingPax', data.payingPax);
+            setHtml('out-payingPaxHint', data.payingPax);
+            setHtml('out-totalPax', data.totalPax);
+            setHtml('out-ex100', formatNum(data.exchangeRate * 100));
+            setHtml('out-exchangeRate', data.exchangeRate);
+            
+            // 수식 내 텍스트 매핑
+            setHtml('txt-flightPrice', formatNum(data.flightPrice));
+            setHtml('txt-totalPax1', data.totalPax);
+            setHtml('txt-payingPax1', data.payingPax);
+            
+            setHtml('txt-ticketingFee', formatNum(data.ticketingFee));
+            setHtml('txt-totalPax2', data.totalPax);
+            setHtml('txt-payingPax2', data.payingPax);
+            
+            setHtml('txt-insurancePerPax', formatNum(data.insurancePerPax));
+            
+            setHtml('txt-hotelJpyPerNight', formatNum(data.hotelJpyPerNight));
+            setHtml('txt-hotelNights', data.hotelNights);
+            
+            setHtml('txt-lunchCount1', data.lunchCount);
+            setHtml('txt-lunchJpy', formatNum(data.lunchJpy));
+            setHtml('txt-lunchCount2', data.lunchCount);
+            
+            setHtml('txt-dinnerCount1', data.dinnerCount);
+            setHtml('txt-dinnerJpy', formatNum(data.dinnerJpy));
+            setHtml('txt-dinnerCount2', data.dinnerCount);
+            
+            setHtml('txt-adm1Name', data.adm1Name);
+            setHtml('txt-adm1Jpy1', formatNum(data.adm1Jpy));
+            setHtml('txt-adm1Jpy2', formatNum(data.adm1Jpy));
+            setHtml('txt-adm2Name', data.adm2Name);
+            setHtml('txt-adm2Jpy1', formatNum(data.adm2Jpy));
+            setHtml('txt-adm2Jpy2', formatNum(data.adm2Jpy));
+
+            setHtml('txt-busTotalJpy', formatNum(data.busTotalJpy));
+            setHtml('txt-payingPax3', data.payingPax);
+            
+            setHtml('txt-waterUnitJpy', formatNum(data.waterUnitJpy));
+            setHtml('txt-waterQty', data.waterQty);
+            setHtml('txt-waterDays', data.waterDays);
+            setHtml('txt-payingPax4', data.payingPax);
+            
+            setHtml('txt-tcTotalJpy', formatNum(data.tcTotalJpy));
+            setHtml('txt-payingPax5', data.payingPax);
+            
+            setHtml('txt-driverTotalJpy', formatNum(data.driverTotalJpy));
+            setHtml('txt-payingPax6', data.payingPax);
+            
+            setHtml('txt-guideTotalJpy', formatNum(data.guideTotalJpy));
+            setHtml('txt-payingPax7', data.payingPax);
+
+            setHtml('txt-jpySubtotal', formatNum(jpySubtotal));
+            setHtml('txt-exchangeRate2', data.exchangeRate);
+
+            // 최종 결괏값 매핑
+            setHtml('out-flightPerPax', formatNum(flightPerPax));
+            setHtml('out-ticketPerPax', formatNum(ticketPerPax));
+            setHtml('out-insurancePerPax', formatNum(data.insurancePerPax));
+            setHtml('out-krwSubtotal', formatNum(krwSubtotal));
+
+            setHtml('out-hotelPerPax', formatNum(hotelPerPax));
+            setHtml('out-lunchPerPax', formatNum(lunchPerPax));
+            setHtml('out-dinnerPerPax', formatNum(dinnerPerPax));
+            setHtml('out-admPerPax', formatNum(admPerPax));
+            setHtml('out-busPerPax', formatNum(busPerPax));
+            setHtml('out-waterPerPax', formatNum(waterPerPax));
+            setHtml('out-tcPerPax', formatNum(tcPerPax));
+            setHtml('out-driverPerPax', formatNum(driverPerPax));
+            setHtml('out-guidePerPax', formatNum(guidePerPax));
+            
+            setHtml('out-jpySubtotal', formatNum(jpySubtotal));
+            setHtml('out-convertedJpyToKrw', formatNum(convertedJpyToKrw));
+            setHtml('out-totalCostKrw', formatNum(totalCostKrw));
+        }
+
+        // 이벤트 리스너 등록
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const key = e.target.id.replace('inp-', '');
+                if (e.target.type === 'number') {
+                    data[key] = isNaN(e.target.value) || e.target.value === '' ? 0 : Number(e.target.value);
+                } else {
+                    data[key] = e.target.value;
+                }
+                render();
+            });
+        });
+
+        // 초기 렌더링
+        window.onload = render;
+    </script>
+</body>
+</html>
