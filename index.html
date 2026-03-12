@@ -74,6 +74,7 @@
                             <select id="inp-currency" class="w-32 border border-gray-300 rounded p-1.5 font-bold text-blue-700 bg-white">
                                 <option value="JPY">JPY (엔화)</option>
                                 <option value="USD">USD (달러)</option>
+                                <option value="CNY">CNY (위안화)</option>
                             </select>
                         </div>
                         <div class="flex items-center justify-between">
@@ -156,7 +157,8 @@
                 <div class="mb-6 pb-4 border-b-2 border-slate-800">
                     <div class="flex justify-between items-end mb-4">
                         <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight"><span id="out-headerGroupName" class="text-blue-700 mr-2"></span>&lt;행사비 1인당 원가 블랙다운&gt;</h2>
-                        <img src="https://blogger.googleusercontent.com/img/a/AVvXsEhDlxjbueW0SvPAcv2A63S2A29MmX556P9-k4UAkVbMJ1xFNP_Hh2xcKk_G1JdNRdYoNe23sxVS7Xg7KX-AVvQ9lMg2SlseZ-7hIAP6xnnXEPFIQ5-Vf6udjQ1nj6QvTi-IDe9W-cxvlQfVoZ7lxXvWw5KNDEhdic3Cewf7qMdAzH8u46QTKLmPLRseN5M=s16000" alt="FLY UNITY" class="h-16 object-contain">
+                        <!-- 요청하신 대로 로고 크기를 h-16에서 h-24로 키웠습니다 -->
+                        <img src="https://blogger.googleusercontent.com/img/a/AVvXsEhDlxjbueW0SvPAcv2A63S2A29MmX556P9-k4UAkVbMJ1xFNP_Hh2xcKk_G1JdNRdYoNe23sxVS7Xg7KX-AVvQ9lMg2SlseZ-7hIAP6xnnXEPFIQ5-Vf6udjQ1nj6QvTi-IDe9W-cxvlQfVoZ7lxXvWw5KNDEhdic3Cewf7qMdAzH8u46QTKLmPLRseN5M=s16000" alt="FLY UNITY" class="h-24 object-contain">
                     </div>
                     
                     <div class="text-sm space-y-2 mt-4 text-slate-800">
@@ -334,7 +336,7 @@
 
     <!-- JavaScript 로직 -->
     <script>
-        // 초기 데이터 상태 (핸들링비, 생수비 0으로 초기화 테스트)
+        // 초기 데이터 상태
         let data = {
             groupName: '강원대 데이터사이언스 재직자 과정',
             currency: 'JPY',
@@ -365,9 +367,9 @@
             adm4Local: 0,
             adm5Name: '',
             adm5Local: 0,
-            landFeeTotal: 0, // 랜드사 핸들링 비용 총액 (0원이면 자동 숨김)
+            landFeeTotal: 0, 
             busTotalLocal: 1000000,
-            waterUnitLocal: 0, // 생수비 단가 (0원이면 자동 숨김)
+            waterUnitLocal: 0, 
             waterQty: 0,
             waterDays: 0,
             tcTotalLocal: 47000,
@@ -383,11 +385,14 @@
                 if (el) el.value = data[key] === 0 && (key === 'landFeeTotal' || key === 'waterUnitLocal' || key === 'waterQty' || key === 'waterDays') ? '' : data[key];
             }
 
-            // 통화 기호 및 명칭 설정
+            // 통화 기호 및 명칭 설정 (CNY 추가)
+            const isUSD = data.currency === 'USD';
             const isJPY = data.currency === 'JPY';
-            const currSym = isJPY ? '¥' : '$';
-            const currCode = isJPY ? 'JPY' : 'USD';
-            const currName = isJPY ? '엔화' : '달러';
+            const isCNY = data.currency === 'CNY';
+            
+            const currSym = isUSD ? '$' : '¥'; // JPY와 CNY 모두 '¥' 기호 사용
+            const currCode = data.currency;
+            const currName = isJPY ? '엔화' : (isUSD ? '달러' : '위안화');
 
             // DOM 내 통화 표기 일괄 업데이트
             document.querySelectorAll('.curr-sym').forEach(el => el.innerHTML = currSym);
@@ -436,7 +441,7 @@
             // --- 조건부 행 숨김 처리 ---
             document.getElementById('row-landFee').style.display = data.landFeeTotal > 0 ? '' : 'none';
             document.getElementById('row-waterFee').style.display = waterTotal > 0 ? '' : 'none';
-            document.getElementById('row-adm').style.display = admPerPax > 0 ? '' : 'none'; // 입장료가 없으면 입장료 행도 숨김
+            document.getElementById('row-adm').style.display = admPerPax > 0 ? '' : 'none';
 
             // 텍스트 업데이트 헬퍼 함수
             const setHtml = (id, val) => {
@@ -456,11 +461,13 @@
             setHtml('out-totalPax', data.totalPax);
             setHtml('out-exchangeRate', data.exchangeRate);
             
-            // 통화별 환율 표기 로직
+            // 통화별 환율 표기 로직 (CNY 추가)
             if (isJPY) {
                 setHtml('out-exDisplay', `JPY 100 = KRW ${formatNum(data.exchangeRate * 100)}`);
-            } else {
+            } else if (isUSD) {
                 setHtml('out-exDisplay', `USD 1 = KRW ${formatNum(data.exchangeRate)}`);
+            } else if (isCNY) {
+                setHtml('out-exDisplay', `CNY 1 = KRW ${formatNum(data.exchangeRate)}`);
             }
             
             // 수식 내 텍스트 매핑
@@ -553,6 +560,7 @@
                 } else {
                     data[key] = e.target.value;
                     
+                    // 통화 변경 시 기본 환율 자동 세팅 로직
                     if(key === 'currency') {
                         if(data.currency === 'USD' && data.exchangeRate < 50) {
                             document.getElementById('inp-exchangeRate').value = 1400;
@@ -560,6 +568,10 @@
                         } else if(data.currency === 'JPY' && data.exchangeRate > 100) {
                             document.getElementById('inp-exchangeRate').value = 9.5;
                             data.exchangeRate = 9.5;
+                        } else if(data.currency === 'CNY' && (data.exchangeRate < 100 || data.exchangeRate > 300)) {
+                            // 중국 위안화 기본 환율 195원 내외로 세팅
+                            document.getElementById('inp-exchangeRate').value = 195;
+                            data.exchangeRate = 195;
                         }
                     }
                 }
